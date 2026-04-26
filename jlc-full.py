@@ -394,7 +394,6 @@ class JLCClient:
         
         error_msg = data.get('message', '未知错误') if data else '请求失败'
         log(f"账号 {self.account_index} - ❌ 获取用户信息失败: {error_msg}")
-        self.sign_status = f"获取用户信息失败:{error_msg}"
         return False
     
     def get_points(self):
@@ -467,7 +466,7 @@ class JLCClient:
         
         error_msg = data.get('message', '未知错误') if data else '请求失败'
         log(f"账号 {self.account_index} - ❌ 检查签到状态失败: {error_msg}")
-        self.sign_status = f"检查状态失败:{error_msg}"
+        self.sign_status = "检查失败"
         return None
     
     def sign_in(self):
@@ -490,20 +489,19 @@ class JLCClient:
                 self.has_reward = True
                 
                 # 领取奖励
-                voucher_success, voucher_msg = self.receive_voucher()
-                if voucher_success:
+                if self.receive_voucher():
                     # 领取奖励成功后，视为签到完成
                     log(f"账号 {self.account_index} - ✅ 奖励领取成功，签到完成")
                     self.sign_status = "领取奖励成功"
                     return True
                 else:
-                    self.sign_status = f"领取奖励失败:{voucher_msg}"
+                    self.sign_status = "领取奖励失败"
                     return False
         else:
             error_msg = data.get('message', '未知错误') if data else '请求失败'
             self.message = error_msg
             log(f"账号 {self.account_index} - ❌ 签到失败: {error_msg}")
-            self.sign_status = f"签到失败:{error_msg}"
+            self.sign_status = "签到失败"
             return False
     
     def receive_voucher(self):
@@ -515,11 +513,11 @@ class JLCClient:
         
         if data and data.get('success'):
             log(f"账号 {self.account_index} - ✅ 领取成功")
-            return True, "成功"
+            return True
         else:
             error_msg = data.get('message', '未知错误') if data else '请求失败'
             log(f"账号 {self.account_index} - ❌ 领取奖励失败: {error_msg}")
-            return False, error_msg
+            return False
     
     def calculate_jindou_difference(self):
         """计算金豆差值"""
@@ -550,9 +548,6 @@ class JLCClient:
             self.initial_jindou = 0
         log(f"账号 {self.account_index} - 签到前金豆💰: {self.initial_jindou}")
         
-        # 将 final_jindou 先设为 initial_jindou，防止中途失败时 final_jindou 为 0
-        self.final_jindou = self.initial_jindou
-        
         time.sleep(random.randint(1, 2))
         
         # 3. 检查签到状态
@@ -571,10 +566,9 @@ class JLCClient:
         time.sleep(random.randint(1, 2))
         
         # 5. 获取签到后金豆数量
-        final = self.get_points()
-        if final is not None and final > 0:
-            self.final_jindou = final
-        # 如果获取失败，final_jindou 保持为 initial_jindou，不会变成 0
+        self.final_jindou = self.get_points()
+        if self.final_jindou is None:
+            self.final_jindou = 0
         log(f"账号 {self.account_index} - 签到后金豆💰: {self.final_jindou}")
         
         # 6. 计算金豆差值
@@ -1582,7 +1576,7 @@ def main():
     global in_summary
     
     if len(sys.argv) < 3:
-        print("用法: python jlc.py 账号1,账号2,账号3... 密码1,密码2,密码3... [失败退出标志] [账号组编号]")
+        print("用法: python jlc.py 账号1,账号2,账号3... 密码1,密码2,密码3...[失败退出标志] [账号组编号]")
         print("示例: python jlc.py user1,user2,user3 pwd1,pwd2,pwd3")
         print("示例: python jlc.py user1,user2,user3 pwd1,pwd2,pwd3 true")
         print("示例: python jlc.py user1,user2,user3 pwd1,pwd2,pwd3 true 4")
@@ -1591,7 +1585,7 @@ def main():
         sys.exit(1)
     
     usernames =[u.strip() for u in sys.argv[1].split(',') if u.strip()]
-    passwords = [p.strip() for p in sys.argv[2].split(',') if p.strip()]
+    passwords =[p.strip() for p in sys.argv[2].split(',') if p.strip()]
     
     # 解析失败退出标志，默认为关闭
     enable_failure_exit = False
@@ -1659,11 +1653,11 @@ def main():
         
         retry_label = ""
         if retry_count > 0:
-             retry_label = f" [重试{retry_count}次]"
+             retry_label = f"[重试{retry_count}次]"
         
         # 密码错误账号的特殊显示
         if password_error:
-            log(f"账号 {account_index} (未知) 详细结果: [密码错误]")
+            log(f"账号 {account_index} (未知) 详细结果:[密码错误]")
             log("  └── 状态: ❌ 账号或密码错误，跳过此账号")
         else:
             log(f"账号 {account_index} ({nickname}) 详细结果:{retry_label}")
@@ -1737,7 +1731,7 @@ def main():
     
     # 失败账号列表（排除密码错误）
     failed_oshwhub = [r['account_index'] for r in all_results if not r['oshwhub_success'] and not r.get('password_error', False)]
-    failed_jindou = [r['account_index'] for r in all_results if not r['jindou_success'] and not r.get('password_error', False)]
+    failed_jindou =[r['account_index'] for r in all_results if not r['jindou_success'] and not r.get('password_error', False)]
     
     if failed_oshwhub:
         log(f"  ⚠ 开源平台失败账号: {', '.join(map(str, failed_oshwhub))}")
